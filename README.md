@@ -1,6 +1,7 @@
 # 3D print files
 
-Finished, published 3MF files for Sam's models on [MakerWorld](https://makerworld.com/en/@Satal) and [Printables](https://www.printables.com/@SamJenkins_1437653).
-One folder per model and version, the files exactly as uploaded. The source and build recipes live in a private repo.
+A staging area for uploading 3MF files over 10 MB to [MakerWorld](https://makerworld.com/en/@Satal) and [Printables](https://www.printables.com/@SamJenkins_1437653), whose browser upload limit is 10 MB.
 
-Licence: the same as each model's listing (Standard Digital File License for these): personal use only, no redistribution.
+A file goes in at `<model folder>/<version>/<file>.3mf`, is uploaded from its raw URL, and is **deleted once the upload is confirmed**. Nothing is kept here. The source, build recipes and released files live in a private repo.
+
+Licence: the same as each model's listing (Standard Digital File License): personal use only, no redistribution.
