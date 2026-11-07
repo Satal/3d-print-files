@@ -30,11 +30,6 @@ groove_w     = hide(6);
 groove_d     = hide(3);
 groove_pitch = hide(26);
 head_c       = hide(11.75);  // end face to head centre (measured: wooden peg tip 18.1, socket far edge 18.5, socket 13.3)
-spring_out   = hide(16.5);   // leaves at rest, across the track
-spring_t     = hide(0.9);    // leaf thickness (two 0.45 mm lines)
-spring_gap   = hide(1.7);    // room for each leaf to bend in
-spring_from  = hide(40);     // leaf joins the core at this angle from the tip (degrees)
-spring_to    = hide(140);    // free end of the leaf
 head_gap     = hide(0.8);    // plate joiner: gap round each head so it can flex
 neck_w       = hide(6);      // inferred, typical
 // House choices
@@ -49,9 +44,7 @@ corner_r     = hide(3);      // rounded corners in plan
 plate_t      = hide(1);
 plate_len    = hide(56);     // runs about 25 mm under each track end
 part         = hide("mini_track");  // plate_joiner exists but is untested
-peg_style    = hide("solid");       // spring heads: experimental, too big in a 13.3 mm socket (v0.4)
 version_tag  = hide("");     // test prints: -D 'version_tag="tj v0.4"'
-end_b_style  = hide("");     // test prints: a different style on the second end ("solid" or "spring")
 $fn          = hide(64);
 
 // ---------- 2D shapes ----------
@@ -88,56 +81,31 @@ module track_side(len) {
 }
 
 // One peg in plan, pointing +X, starting at x = 0 (the end face).
-function core_d(style, width) = style == "spring" ? spring_out - 2*(spring_t + spring_gap) : width;
-module arc_band(r_out, t, a0, a1) {
-  // ring segment between angles a0 and a1 (degrees, 0 = +X)
-  intersection() {
-    difference() { circle(r_out); circle(r_out - t); }
-    polygon(concat([[0, 0]], [for (a = [a0 : 5 : a1]) 2*r_out*[cos(a), sin(a)]], [2*r_out*[cos(a1), sin(a1)]]));
-  }
-}
-// Neck and core (and a solid head). inset shrinks it for the chamfered bands.
-module core_plan(style, width, inset) {
+// Neck and round head. inset shrinks it for the chamfered bands.
+module peg_plan(width, inset = 0) {
   offset(-inset) {
     translate([-1, -neck_w/2]) square([head_c + 1, neck_w]);
-    translate([head_c, 0]) circle(d = core_d(style, width));
+    translate([head_c, 0]) circle(d = width);
   }
 }
-// The two leaves and their roots. shift moves the leaf in without thinning it,
-// so the chamfered bands keep their full thickness and sit on what is below.
-module leaf_plan(shift) {
-  cd = core_d("spring", 0);
-  translate([head_c, 0]) for (m = [0, 1]) mirror([0, m]) {
-    arc_band(spring_out/2 - shift, spring_t, spring_from, spring_to);
-    hull() {
-      rotate(spring_from + 4) translate([cd/2 - 1, 0]) circle(d = 1.6);
-      rotate(spring_from + 4) translate([spring_out/2 - shift - spring_t/2, 0]) circle(d = spring_t);
-    }
-  }
-}
-module peg_plan(style, width, inset = 0) {
-  core_plan(style, width, inset);
-  if (style == "spring") leaf_plan(inset);
-}
-function head_r(style, width) = style == "spring" ? spring_out/2 : width/2;
 
 // ---------- 3D ----------
 
 // A peg with a lead-in chamfer round the bottom of the head.
-module peg(style, width, h) {
+module peg(width, h) {
   n = 4;
   union() {
-    translate([0, 0, lead_in]) linear_extrude(h - lead_in - top_round) peg_plan(style, width);
+    translate([0, 0, lead_in]) linear_extrude(h - lead_in - top_round) peg_plan(width);
     // bottom band, inset by the lead-in, tapering out (45 degrees, no support)
     for (i = [0 : n - 1]) {
       z0 = i * lead_in / n;
-      translate([0, 0, z0]) linear_extrude(lead_in / n + 0.01) peg_plan(style, width, lead_in - z0);
+      translate([0, 0, z0]) linear_extrude(lead_in / n + 0.01) peg_plan(width, lead_in - z0);
     }
     // top band, rounded in (no overhang going up)
     for (i = [0 : n - 1]) {
       dz = (i + 1) * top_round / n;
       inset = top_round - sqrt(max(0, top_round*top_round - dz*dz));
-      translate([0, 0, h - top_round + i * top_round / n - 0.01]) linear_extrude(top_round / n + 0.01) peg_plan(style, width, inset);
+      translate([0, 0, h - top_round + i * top_round / n - 0.01]) linear_extrude(top_round / n + 0.01) peg_plan(width, inset);
     }
   }
 }
@@ -157,28 +125,22 @@ module version_marker() {
       text(version_tag, size = 4, font = "Roboto:style=Bold", halign = "center", valign = "center");
 }
 
-module mini_track(len, style, width, label = "", style_b = "") {
-  sb = style_b != "" ? style_b : style;
+module mini_track(len, width, label = "") {
   difference() {
     union() {
       track_body(len);
-      translate([len/2, 0, 0]) peg(style, width, peg_h);
-      translate([-len/2, 0, 0]) mirror([1, 0, 0]) peg(sb, width, peg_h);
+      translate([len/2, 0, 0]) peg(width, peg_h);
+      translate([-len/2, 0, 0]) mirror([1, 0, 0]) peg(width, peg_h);
     }
     version_marker();
-    // two head styles: each end's style sunk underneath, by its end
-    if (sb != style)
-      for (e = [[len/2 - 8, style], [-len/2 + 8, sb]])
-        translate([e[0], 0, -0.01]) rotate([0, 0, 90]) mirror([1, 0, 0]) linear_extrude(0.41)
-          text(e[1] == "spring" ? "SPR" : str("S", width), size = 4, font = "Roboto:style=Bold", halign = "center", valign = "center");
     if (label != "")
       translate([0, 0, track_h - 0.6]) linear_extrude(1)
         text(label, size = 6, font = "Roboto:style=Bold", halign = "center", valign = "center");
   }
 }
 
-module plate_joiner(style, width) {
-  r = head_r(style, width) + head_gap;
+module plate_joiner(width) {
+  r = width/2 + head_gap;
   difference() {
     union() {
       difference() {
@@ -191,8 +153,8 @@ module plate_joiner(style, width) {
         for (s = [-1, 1]) translate([s*head_c, 0, -1]) cylinder(r = r, h = plate_t + 2);
       }
       // two pegs back to back, standing on the bed like a track's own pegs
-      peg(style, width, peg_h);
-      mirror([1, 0, 0]) peg(style, width, peg_h);
+      peg(width, peg_h);
+      mirror([1, 0, 0]) peg(width, peg_h);
     }
     if (version_tag != "")
       translate([0, -track_w/2 + 4, -0.01]) mirror([1, 0, 0]) linear_extrude(0.41)
@@ -200,5 +162,5 @@ module plate_joiner(style, width) {
   }
 }
 
-if (part == "mini_track") mini_track(track_length, peg_style, peg_width, "", end_b_style);
-else if (part == "plate_joiner") plate_joiner(peg_style, peg_width);
+if (part == "mini_track") mini_track(track_length, peg_width);
+else if (part == "plate_joiner") plate_joiner(peg_width);
